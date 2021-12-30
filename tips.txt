@@ -1,0 +1,4 @@
+
+docker build --network host $(env | cut -f1 -d= | grep -E '_(proxy|REPO|VER)$' | sed 's/^/--build-arg /') --build-arg UID=$(id -u) --build-arg GID=$(id -g) -t ris:1.0 -f Dockerfile .
+
+docker run --gpus all -it --rm -v /home/media/workspace/RetrieveInStyle:/home/test -v /tmp/.X11-unix:/tmp/.X11-unix --network host  -e https_proxy=http://child-prc.intel.com:913 -e http_proxy=http://child-prc.intel.com:913 -e no_proxy=127.0.0.1,*.intel.com,10.244.0.0/16,10.96.0.0/12 -e DISPLAY=$DISPLAY ris:1.0 bash
