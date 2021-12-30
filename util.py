@@ -55,11 +55,11 @@ def ensure_checkpoint_exists(model_weights_filename):
 
 # given a list of filenames, load the inverted style code
 @torch.no_grad()
-def load_source(files, generator, device='cuda'):
+def load_source(files, generator, folder='inversion_codes', device='cuda'):
     sources = []
     
     for file in files:
-        source = torch.load(f'./inversion_codes/{file}.pt')['latent'].to(device)
+        source = torch.load(f'{folder}/{file}.pt')['latent'].to(device)
 
         if source.size(0) != 1:
             source = source.unsqueeze(0)
@@ -141,21 +141,23 @@ def flatten_act(x):
     x = x.pow(2).permute(0,2,3,1).contiguous().view(-1, c) # [b,c]
     return x.cpu().numpy()
 
-def show(imgs, title=None):
-
-    plt.figure(figsize=(5 * len(imgs), 5))
+def show(imgs, title=None,save=False,save_path='none.png'):
+    fig=plt.figure(figsize=(5 * len(imgs), 5))
     if title is not None:
         plt.suptitle(title + '\n', fontsize=24).set_y(1.05)
 
     for i in range(len(imgs)):
         plt.subplot(1, len(imgs), i + 1)
-        plt.imshow(imgs[i])
+        plt.imshow(imgs[i].detach().numpy())
         plt.axis('off')
         plt.gca().set_axis_off()
         plt.subplots_adjust(top=1, bottom=0, right=1, left=0,
                             hspace=0, wspace=0.02)
+    if save:
+        plt.savefig(save_path)
+    return fig
 
-def part_grid(target_image, refernce_images, part_images):
+def part_grid(target_image, refernce_images, part_images,save=False,save_path='Source_Reference.png'):
     def proc(img):
         return (img * 255).permute(1, 2, 0).squeeze().cpu().numpy().astype('uint8')
 
@@ -195,6 +197,8 @@ def part_grid(target_image, refernce_images, part_images):
 
         plt.tight_layout(pad=0, w_pad=0, h_pad=0)
         plt.subplots_adjust(wspace=0, hspace=0)
+    if save:
+        plt.savefig(save_path)
     return fig
 
 
@@ -211,6 +215,25 @@ def display_image(image, size=256, mode='nearest', unnorm=False, title=''):
     plt.title(title)
     plt.axis('off')
     plt.imshow(image)
+
+def save_image_1(image, title='tmp.jpg'):
+    if image.is_cuda:
+        image = image.cpu()
+    if image.dim() == 4:
+        image = image[0]
+    image = ((image.clamp(-1,1)+1)/2).permute(1, 2, 0).detach().numpy()
+    Image.fromarray(image.astype('uint8')).save(title)
+
+def save_image(image, title='tmp.jpg'):
+    if image.is_cuda:
+        image = image.cpu()
+    if image.dim() == 4:
+        image = image[0]
+    image = image.detach().numpy()
+    plt.figure()
+    plt.axis('off')
+    plt.imshow(image)
+    plt.savefig(title)
 
 def get_parsing_labels():
     color = torch.FloatTensor([[0, 0, 0],
@@ -292,13 +315,13 @@ def get_landmark(filepath, predictor):
     return lm
 
 
-def align_face(filepath, output_size=512):
+def align_face(filepath, output_size=512,model_path="models/dlibshape_predictor_68_face_landmarks.dat"):
     """
     :param filepath: str
     :return: PIL Image
     """
-    ensure_checkpoint_exists("dlibshape_predictor_68_face_landmarks.dat")
-    predictor = dlib.shape_predictor("dlibshape_predictor_68_face_landmarks.dat")
+    ensure_checkpoint_exists(model_path)
+    predictor = dlib.shape_predictor(model_path)
     lm = get_landmark(filepath, predictor)
 
     lm_chin = lm[0: 17]  # left-right
